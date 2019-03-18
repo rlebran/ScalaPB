@@ -3,6 +3,9 @@ package scalapb.grpc
 import com.google.common.util.concurrent.{FutureCallback, Futures, ListenableFuture, MoreExecutors}
 import io.grpc.{Status, StatusException, StatusRuntimeException}
 import io.grpc.stub.StreamObserver
+import monix.eval.Task
+import monix.execution.CancelablePromise
+
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
@@ -33,4 +36,18 @@ object Grpc {
           Status.INTERNAL.withDescription(e.getMessage).withCause(e).asException()
         )
     }
+
+  def guavaFuture2Task[A](guavaFuture: ListenableFuture[A]): Task[A] = {
+    val p = CancelablePromise[A]()
+    Futures.addCallback(
+      guavaFuture,
+      new FutureCallback[A] {
+        override def onFailure(t: Throwable): Unit = p.failure(t)
+        override def onSuccess(a: A): Unit         = p.success(a)
+      },
+      MoreExecutors.directExecutor()
+    )
+
+    Task.fromCancelablePromise(p)
+  }
 }

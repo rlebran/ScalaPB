@@ -24,11 +24,11 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
     })
   }
 
-  private[this] def cancelableMethodSignature(method: MethodDescriptor, overrideSig: Boolean) = {
+  private[this] def monixMethodSignature(method: MethodDescriptor, overrideSig: Boolean) = {
     val overrideStr = if (overrideSig) "override " else ""
     s"${method.deprecatedAnnotation}${overrideStr}def ${method.name}" + (method.streamType match {
       case StreamType.Unary =>
-        s"(request: ${method.inputType.scalaType}): com.google.common.util.concurrent.ListenableFuture[${method.outputType.scalaType}]"
+        s"(request: ${method.inputType.scalaType}): monix.eval.Task[${method.outputType.scalaType}]"
       case StreamType.ClientStreaming =>
         s"(responseObserver: ${observer(method.outputType.scalaType)}): ${observer(method.inputType.scalaType)}"
       case StreamType.ServerStreaming =>
@@ -62,15 +62,15 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .add("}")
   }
 
-  private[this] def cancelableServiceTrait: PrinterEndo = { p =>
+  private[this] def monixServiceTrait: PrinterEndo = { p =>
     p.call(generateScalaDoc(service))
-      .add(s"trait ${service.name.capitalize}CancelableClient extends _root_.scalapb.grpc.AbstractService {")
+      .add(s"trait ${service.name.capitalize}MonixClient extends _root_.scalapb.grpc.AbstractService {")
       .indent
       .add(s"override def serviceCompanion = ${service.name}")
       .print(service.methods) {
         case (p, method) =>
           p.call(generateScalaDoc(method))
-            .add(cancelableMethodSignature(method, overrideSig = false))
+            .add(monixMethodSignature(method, overrideSig = false))
       }
       .outdent
       .add("}")
@@ -118,16 +118,16 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
   private[this] def clientMethodImpl(m: MethodDescriptor,
                                      blocking: Boolean,
-                                     cancelable: Boolean = false) =
+                                     monix: Boolean = false) =
     PrinterEndo { p =>
       val sig =
         if (blocking) blockingMethodSignature(m, overrideSig = true) + " = {"
-        else if (cancelable) cancelableMethodSignature(m, overrideSig = true) + " = {"
+        else if (monix) monixMethodSignature(m, overrideSig = true) + " = {"
         else serviceMethodSignature(m, overrideSig = true) + " = {"
 
       val prefix = {
         if (blocking) "blocking"
-        else if (cancelable && m.streamType == StreamType.Unary) "cancelableAsync"
+        else if (monix && m.streamType == StreamType.Unary) "taskAsync"
         else "async"
       }
 
@@ -174,9 +174,9 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
     stubImplementation(service.stub, service.name, methods)
   }
 
-  private[this] val cancelableStub: PrinterEndo = {
+  private[this] val monixStub: PrinterEndo = {
     val methods = service.getMethods.asScala.map(clientMethodImpl(_, false, true))
-    stubImplementation(service.cancelableStub, service.cancelableClient, methods)
+    stubImplementation(service.monixStub, service.monixClient, methods)
   }
 
   private[this] def methodDescriptor(method: MethodDescriptor) = PrinterEndo { p =>
@@ -276,7 +276,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .outdent
   }
 
-  private[this] def addCancelableUnaryMethodImplementation(method: MethodDescriptor): PrinterEndo =
+  private[this] def addMonixUnaryMethodImplementation(method: MethodDescriptor): PrinterEndo =
     PrinterEndo {
       _.add(".addMethod(")
         .add(s"  ${method.descriptorName},")
@@ -299,10 +299,10 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
   private[this] val bindService = {
     val executionContext = "executionContext"
-    val cancelableMethod = service.methods
+    val monixMethod = service.methods
       .filter(_.streamType == StreamType.Unary)
-      .map(addCancelableUnaryMethodImplementation)
-    val methods          = service.methods.map(addMethodImplementation) ++ cancelableMethod
+      .map(addMonixUnaryMethodImplementation)
+    val methods          = service.methods.map(addMethodImplementation) ++ monixMethod
     val serverServiceDef = "_root_.io.grpc.ServerServiceDefinition"
 
     PrinterEndo(
@@ -330,7 +330,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .newline
       .call(serviceTraitCompanion)
       .newline
-      .call(cancelableServiceTrait)
+      .call(monixServiceTrait)
       .newline
       .call(blockingClientTrait)
       .newline
@@ -338,7 +338,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .newline
       .call(stub)
       .newline
-      .call(cancelableStub)
+      .call(monixStub)
       .newline
       .call(bindService)
       .newline
@@ -348,7 +348,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .newline
       .add(s"def stub(channel: $channel): ${service.stub} = new ${service.stub}(channel)")
       .newline
-      .add(s"def cancelableStub(channel: $channel): ${service.cancelableStub} = new ${service.cancelableStub}(channel)")
+      .add(s"def monixStub(channel: $channel): ${service.monixStub} = new ${service.monixStub}(channel)")
       .newline
       .add(
         s"def javaDescriptor: _root_.com.google.protobuf.Descriptors.ServiceDescriptor = ${service.getFile.fileDescriptorObjectFullName}.javaDescriptor.getServices().get(${service.getIndex})"
