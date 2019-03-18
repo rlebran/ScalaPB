@@ -1,4 +1,5 @@
 package scalapb.grpc
+import com.google.common.util.concurrent.ListenableFuture
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, MethodDescriptor}
 
@@ -24,6 +25,15 @@ object ClientCalls {
     Grpc.guavaFuture2ScalaFuture(
       io.grpc.stub.ClientCalls.futureUnaryCall(channel.newCall(method, options), request)
     )
+  }
+
+  def cancelableAsyncUnaryCall[ReqT, RespT](
+      channel: Channel,
+      method: MethodDescriptor[ReqT, RespT],
+      options: CallOptions,
+      request: ReqT
+  ): ListenableFuture[RespT] = {
+    io.grpc.stub.ClientCalls.futureUnaryCall(channel.newCall(method, options), request)
   }
 
   def blockingServerStreamingCall[ReqT, RespT](

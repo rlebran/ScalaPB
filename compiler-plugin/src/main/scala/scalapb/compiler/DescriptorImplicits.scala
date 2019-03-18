@@ -147,9 +147,13 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
 
     def blockingClient = self.getName + "BlockingClient"
 
+    def cancelableClient = self.getName + "CancelableClient"
+
     def blockingStub = self.getName + "BlockingStub"
 
     def stub = self.getName + "Stub"
+
+    def cancelableStub = self.getName + "CancelableStub"
 
     def methods = self.getMethods.asScala.toIndexedSeq
 

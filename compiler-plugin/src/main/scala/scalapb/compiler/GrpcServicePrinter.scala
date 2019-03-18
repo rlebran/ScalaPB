@@ -24,6 +24,20 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
     })
   }
 
+  private[this] def cancelableMethodSignature(method: MethodDescriptor, overrideSig: Boolean) = {
+    val overrideStr = if (overrideSig) "override " else ""
+    s"${method.deprecatedAnnotation}${overrideStr}def ${method.name}" + (method.streamType match {
+      case StreamType.Unary =>
+        s"(request: ${method.inputType.scalaType}): com.google.common.util.concurrent.ListenableFuture[${method.outputType.scalaType}]"
+      case StreamType.ClientStreaming =>
+        s"(responseObserver: ${observer(method.outputType.scalaType)}): ${observer(method.inputType.scalaType)}"
+      case StreamType.ServerStreaming =>
+        s"(request: ${method.inputType.scalaType}, responseObserver: ${observer(method.outputType.scalaType)}): Unit"
+      case StreamType.Bidirectional =>
+        s"(responseObserver: ${observer(method.outputType.scalaType)}): ${observer(method.inputType.scalaType)}"
+    })
+  }
+
   private[this] def blockingMethodSignature(method: MethodDescriptor, overrideSig: Boolean) = {
     val overrideStr = if (overrideSig) "override " else ""
     s"${method.deprecatedAnnotation}${overrideStr}def ${method.name}" + (method.streamType match {
@@ -43,6 +57,20 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .print(service.methods) {
         case (p, method) =>
           p.call(generateScalaDoc(method)).add(serviceMethodSignature(method, overrideSig = false))
+      }
+      .outdent
+      .add("}")
+  }
+
+  private[this] def cancelableServiceTrait: PrinterEndo = { p =>
+    p.call(generateScalaDoc(service))
+      .add(s"trait ${service.name.capitalize}CancelableClient extends _root_.scalapb.grpc.AbstractService {")
+      .indent
+      .add(s"override def serviceCompanion = ${service.name}")
+      .print(service.methods) {
+        case (p, method) =>
+          p.call(generateScalaDoc(method))
+            .add(cancelableMethodSignature(method, overrideSig = false))
       }
       .outdent
       .add("}")
@@ -88,13 +116,20 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
   private[this] val serverCalls = "_root_.io.grpc.stub.ServerCalls"
   private[this] val clientCalls = "_root_.scalapb.grpc.ClientCalls"
 
-  private[this] def clientMethodImpl(m: MethodDescriptor, blocking: Boolean) =
+  private[this] def clientMethodImpl(m: MethodDescriptor,
+                                     blocking: Boolean,
+                                     cancelable: Boolean = false) =
     PrinterEndo { p =>
       val sig =
         if (blocking) blockingMethodSignature(m, overrideSig = true) + " = {"
+        else if (cancelable) cancelableMethodSignature(m, overrideSig = true) + " = {"
         else serviceMethodSignature(m, overrideSig = true) + " = {"
 
-      val prefix = if (blocking) "blocking" else "async"
+      val prefix = {
+        if (blocking) "blocking"
+        else if (cancelable && m.streamType == StreamType.Unary) "cancelableAsync"
+        else "async"
+      }
 
       val methodName = prefix + (m.streamType match {
         case StreamType.Unary           => "UnaryCall"
@@ -137,6 +172,11 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
   private[this] val stub: PrinterEndo = {
     val methods = service.getMethods.asScala.map(clientMethodImpl(_, false))
     stubImplementation(service.stub, service.name, methods)
+  }
+
+  private[this] val cancelableStub: PrinterEndo = {
+    val methods = service.getMethods.asScala.map(clientMethodImpl(_, false, true))
+    stubImplementation(service.cancelableStub, service.cancelableClient, methods)
   }
 
   private[this] def methodDescriptor(method: MethodDescriptor) = PrinterEndo { p =>
@@ -236,9 +276,33 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .outdent
   }
 
+  private[this] def addCancelableUnaryMethodImplementation(method: MethodDescriptor): PrinterEndo =
+    PrinterEndo {
+      _.add(".addMethod(")
+        .add(s"  ${method.descriptorName},")
+        .indent
+        .call(PrinterEndo { p =>
+          val call             = s"$serverCalls.asyncUnaryCall"
+          val executionContext = "executionContext"
+          val serviceImpl      = "serviceImpl"
+
+          val serverMethod =
+            s"$serverCalls.UnaryMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
+          p.addStringMargin(s"""$call(new $serverMethod {
+          |  override def invoke(request: ${method.inputType.scalaType}, observer: $streamObserver[${method.outputType.scalaType}]): Unit =
+          |    $serviceImpl.${method.name}(request).onComplete(scalapb.grpc.Grpc.completeObserver(observer))(
+          |      $executionContext)
+          |}))""")
+        })
+        .outdent
+    }
+
   private[this] val bindService = {
     val executionContext = "executionContext"
-    val methods          = service.methods.map(addMethodImplementation)
+    val cancelableMethod = service.methods
+      .filter(_.streamType == StreamType.Unary)
+      .map(addCancelableUnaryMethodImplementation)
+    val methods          = service.methods.map(addMethodImplementation) ++ cancelableMethod
     val serverServiceDef = "_root_.io.grpc.ServerServiceDefinition"
 
     PrinterEndo(
@@ -266,11 +330,15 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .newline
       .call(serviceTraitCompanion)
       .newline
+      .call(cancelableServiceTrait)
+      .newline
       .call(blockingClientTrait)
       .newline
       .call(blockingStub)
       .newline
       .call(stub)
+      .newline
+      .call(cancelableStub)
       .newline
       .call(bindService)
       .newline
@@ -279,6 +347,8 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       )
       .newline
       .add(s"def stub(channel: $channel): ${service.stub} = new ${service.stub}(channel)")
+      .newline
+      .add(s"def cancelableStub(channel: $channel): ${service.cancelableStub} = new ${service.cancelableStub}(channel)")
       .newline
       .add(
         s"def javaDescriptor: _root_.com.google.protobuf.Descriptors.ServiceDescriptor = ${service.getFile.fileDescriptorObjectFullName}.javaDescriptor.getServices().get(${service.getIndex})"
