@@ -1,6 +1,8 @@
 package scalapb.compiler
 
 import com.google.protobuf.Descriptors.{MethodDescriptor, ServiceDescriptor}
+import monix.eval.Task
+import monix.execution.Callback
 import scalapb.compiler.FunctionalPrinter.PrinterEndo
 import scalapb.compiler.ProtobufGenerator.asScalaDocBlock
 
@@ -64,7 +66,8 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
   private[this] def monixServiceTrait: PrinterEndo = { p =>
     p.call(generateScalaDoc(service))
-      .add(s"trait ${service.name.capitalize}MonixClient extends _root_.scalapb.grpc.AbstractService {")
+      .add(
+        s"trait ${service.name.capitalize}MonixClient extends _root_.scalapb.grpc.AbstractService {")
       .indent
       .add(s"override def serviceCompanion = ${service.name}")
       .print(service.methods) {
@@ -282,16 +285,17 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
         .add(s"  ${method.descriptorName},")
         .indent
         .call(PrinterEndo { p =>
-          val call             = s"$serverCalls.asyncUnaryCall"
-          val executionContext = "executionContext"
-          val serviceImpl      = "serviceImpl"
+          val call        = s"$serverCalls.asyncUnaryCall"
+          val scheduler   = "scheduler"
+          val serviceImpl = "serviceImpl"
 
           val serverMethod =
             s"$serverCalls.UnaryMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
           p.addStringMargin(s"""$call(new $serverMethod {
           |  override def invoke(request: ${method.inputType.scalaType}, observer: $streamObserver[${method.outputType.scalaType}]): Unit =
-          |    $serviceImpl.${method.name}(request).onComplete(scalapb.grpc.Grpc.completeObserver(observer))(
-          |      $executionContext)
+          |    $serviceImpl.${method.name}(request)
+          |       .runToFuture($scheduler)
+          |       .onComplete(scalapb.grpc.Grpc.completeObserver(observer))($scheduler)
           |}))""")
         })
         .outdent
@@ -314,7 +318,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
   }
 
   private[this] val bindMonixService = {
-    val executionContext = "executionContext"
+    val scheduler = "scheduler"
     val monixMethod = service.methods
       .filter(_.streamType == StreamType.Unary)
       .map(addMonixUnaryMethodImplementation)
@@ -322,7 +326,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
     PrinterEndo(
       _.add(
-        s"""def bindService(serviceImpl: ${service.monixClient}, $executionContext: scala.concurrent.ExecutionContext): $serverServiceDef ="""
+        s"""def bindService(serviceImpl: ${service.monixClient}, $scheduler: monix.execution.Scheduler): $serverServiceDef ="""
       ).indent
         .add(s"""$serverServiceDef.builder(${service.descriptorName})""")
         .call(monixMethod: _*)
@@ -365,7 +369,8 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .newline
       .add(s"def stub(channel: $channel): ${service.stub} = new ${service.stub}(channel)")
       .newline
-      .add(s"def monixStub(channel: $channel): ${service.monixStub} = new ${service.monixStub}(channel)")
+      .add(
+        s"def monixStub(channel: $channel): ${service.monixStub} = new ${service.monixStub}(channel)")
       .newline
       .add(
         s"def javaDescriptor: _root_.com.google.protobuf.Descriptors.ServiceDescriptor = ${service.getFile.fileDescriptorObjectFullName}.javaDescriptor.getServices().get(${service.getIndex})"
