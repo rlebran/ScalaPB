@@ -299,10 +299,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
   private[this] val bindService = {
     val executionContext = "executionContext"
-    val monixMethod = service.methods
-      .filter(_.streamType == StreamType.Unary)
-      .map(addMonixUnaryMethodImplementation)
-    val methods          = service.methods.map(addMethodImplementation) ++ monixMethod
+    val methods          = service.methods.map(addMethodImplementation)
     val serverServiceDef = "_root_.io.grpc.ServerServiceDefinition"
 
     PrinterEndo(
@@ -311,6 +308,24 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       ).indent
         .add(s"""$serverServiceDef.builder(${service.descriptorName})""")
         .call(methods: _*)
+        .add(".build()")
+        .outdent
+    )
+  }
+
+  private[this] val bindMonixService = {
+    val executionContext = "executionContext"
+    val monixMethod = service.methods
+      .filter(_.streamType == StreamType.Unary)
+      .map(addMonixUnaryMethodImplementation)
+    val serverServiceDef = "_root_.io.grpc.ServerServiceDefinition"
+
+    PrinterEndo(
+      _.add(
+        s"""def bindService(serviceImpl: ${service.monixClient}, $executionContext: scala.concurrent.ExecutionContext): $serverServiceDef ="""
+      ).indent
+        .add(s"""$serverServiceDef.builder(${service.descriptorName})""")
+        .call(monixMethod: _*)
         .add(".build()")
         .outdent
     )
@@ -341,6 +356,8 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .call(monixStub)
       .newline
       .call(bindService)
+      .newline
+      .call(bindMonixService)
       .newline
       .add(
         s"def blockingStub(channel: $channel): ${service.blockingStub} = new ${service.blockingStub}(channel)"
