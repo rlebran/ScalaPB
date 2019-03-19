@@ -1,8 +1,6 @@
 package scalapb.compiler
 
 import com.google.protobuf.Descriptors.{MethodDescriptor, ServiceDescriptor}
-import monix.eval.Task
-import monix.execution.Callback
 import scalapb.compiler.FunctionalPrinter.PrinterEndo
 import scalapb.compiler.ProtobufGenerator.asScalaDocBlock
 
@@ -11,6 +9,7 @@ import scala.collection.JavaConverters._
 final class GrpcServicePrinter(service: ServiceDescriptor, implicits: DescriptorImplicits) {
   import implicits._
   private[this] def observer(typeParam: String): String = s"$streamObserver[$typeParam]"
+  private[this] def observable(typeParam: String): String = s"$observable[$typeParam]"
 
   private[this] def serviceMethodSignature(method: MethodDescriptor, overrideSig: Boolean) = {
     val overrideStr = if (overrideSig) "override " else ""
@@ -32,11 +31,11 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       case StreamType.Unary =>
         s"(request: ${method.inputType.scalaType}): monix.eval.Task[${method.outputType.scalaType}]"
       case StreamType.ClientStreaming =>
-        s"(responseObserver: ${observer(method.outputType.scalaType)}): ${observer(method.inputType.scalaType)}"
+        s"(request: ${method.inputType.scalaType}): ${observable(method.outputType.scalaType)}"
       case StreamType.ServerStreaming =>
-        s"(request: ${method.inputType.scalaType}, responseObserver: ${observer(method.outputType.scalaType)}): Unit"
+        s"(request: ${method.inputType.scalaType}): ${observable(method.outputType.scalaType)}"
       case StreamType.Bidirectional =>
-        s"(responseObserver: ${observer(method.outputType.scalaType)}): ${observer(method.inputType.scalaType)}"
+        s"(request: ${observable(method.inputType.scalaType)}): ${observable(method.outputType.scalaType)}"
     })
   }
 
@@ -116,6 +115,8 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
   private[this] val abstractStub   = "_root_.io.grpc.stub.AbstractStub"
   private[this] val streamObserver = "_root_.io.grpc.stub.StreamObserver"
 
+  private[this] val observable = "monix.reactive.Observable"
+
   private[this] val serverCalls = "_root_.io.grpc.stub.ServerCalls"
   private[this] val clientCalls = "_root_.scalapb.grpc.ClientCalls"
 
@@ -130,7 +131,12 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
       val prefix = {
         if (blocking) "blocking"
-        else if (monix && m.streamType == StreamType.Unary) "taskAsync"
+        else if (monix) {
+          m.streamType match {
+            case StreamType.Unary => "taskAsync"
+            case _ => ???
+          }
+        }
         else "async"
       }
 
@@ -279,24 +285,50 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .outdent
   }
 
-  private[this] def addMonixUnaryMethodImplementation(method: MethodDescriptor): PrinterEndo =
+  private[this] def addMonixMethodImplementation(method: MethodDescriptor): PrinterEndo =
     PrinterEndo {
       _.add(".addMethod(")
         .add(s"  ${method.descriptorName},")
         .indent
         .call(PrinterEndo { p =>
-          val call        = s"$serverCalls.asyncUnaryCall"
-          val scheduler   = "scheduler"
-          val serviceImpl = "serviceImpl"
+          val call = method.streamType match {
+            case StreamType.Unary           => s"$serverCalls.asyncUnaryCall"
+            case StreamType.ClientStreaming => s"$serverCalls.asyncClientStreamingCall"
+            case StreamType.ServerStreaming => s"$serverCalls.asyncServerStreamingCall"
+            case StreamType.Bidirectional   => s"$serverCalls.asyncBidiStreamingCall"
+          }
 
-          val serverMethod =
-            s"$serverCalls.UnaryMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
-          p.addStringMargin(s"""$call(new $serverMethod {
-          |  override def invoke(request: ${method.inputType.scalaType}, observer: $streamObserver[${method.outputType.scalaType}]): Unit =
-          |    $serviceImpl.${method.name}(request)
-          |       .runToFuture($scheduler)
-          |       .onComplete(scalapb.grpc.Grpc.completeObserver(observer))($scheduler)
-          |}))""")
+          val serviceImpl = "serviceImpl"
+          val scheduler   = "scheduler"
+
+          method.streamType match {
+            case StreamType.Unary =>
+              val serverMethod =
+                s"$serverCalls.UnaryMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
+              p.addStringMargin(s"""$call(new $serverMethod {
+              |  override def invoke(request: ${method.inputType.scalaType}, observer: $streamObserver[${method.outputType.scalaType}]): Unit =
+              |    $serviceImpl.${method.name}(request)
+              |       .runToFuture($scheduler)
+              |       .onComplete(scalapb.grpc.Grpc.completeObserver(observer))($scheduler)
+              |}))""")
+            case StreamType.ServerStreaming =>
+              val serverMethod =
+                s"$serverCalls.ServerStreamingMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
+              p.addStringMargin(s"""$call(new $serverMethod {
+              |  override def invoke(request: ${method.inputType.scalaType}, observer: $streamObserver[${method.outputType.scalaType}]): Unit =
+              |    $serviceImpl.${method.name}(request, observer)
+              |}))""")
+            case _ =>
+              val serverMethod = if (method.streamType == StreamType.ClientStreaming) {
+                s"$serverCalls.ClientStreamingMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
+              } else {
+                s"$serverCalls.BidiStreamingMethod[${method.inputType.scalaType}, ${method.outputType.scalaType}]"
+              }
+              p.addStringMargin(s"""$call(new $serverMethod {
+              |  override def invoke(observer: $streamObserver[${method.outputType.scalaType}]): $streamObserver[${method.inputType.scalaType}] =
+              |    $serviceImpl.${method.name}(observer)
+              |}))""")
+          }
         })
         .outdent
     }
@@ -319,9 +351,7 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
 
   private[this] val bindMonixService = {
     val scheduler = "scheduler"
-    val monixMethod = service.methods
-      .filter(_.streamType == StreamType.Unary)
-      .map(addMonixUnaryMethodImplementation)
+    val monixMethod = service.methods.map(addMonixMethodImplementation)
     val serverServiceDef = "_root_.io.grpc.ServerServiceDefinition"
 
     PrinterEndo(
@@ -370,7 +400,8 @@ final class GrpcServicePrinter(service: ServiceDescriptor, implicits: Descriptor
       .add(s"def stub(channel: $channel): ${service.stub} = new ${service.stub}(channel)")
       .newline
       .add(
-        s"def monixStub(channel: $channel): ${service.monixStub} = new ${service.monixStub}(channel)")
+        s"""def monixStub(channel: $channel,
+           |options: _root_.io.grpc.CallOptions = _root_.io.grpc.CallOptions.DEFAULT): ${service.monixStub} = new ${service.monixStub}(channel, options)""".stripMargin)
       .newline
       .add(
         s"def javaDescriptor: _root_.com.google.protobuf.Descriptors.ServiceDescriptor = ${service.getFile.fileDescriptorObjectFullName}.javaDescriptor.getServices().get(${service.getIndex})"

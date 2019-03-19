@@ -2,6 +2,7 @@ package scalapb.grpc
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, MethodDescriptor}
 import monix.eval.Task
+import monix.reactive.Observable
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -58,6 +59,20 @@ object ClientCalls {
   ): Unit = {
     io.grpc.stub.ClientCalls
       .asyncServerStreamingCall(channel.newCall(method, options), request, responseObserver)
+  }
+
+  def monixAsyncServerStreamingCall[ReqT, RespT](
+      channel: Channel,
+      method: MethodDescriptor[ReqT, RespT],
+      options: CallOptions,
+      request: ReqT,
+      responseObserver: StreamObserver[RespT]
+  ): Observable[RespT] = {
+    MonixGrpcAdapters.observe(
+      io.grpc.stub.ClientCalls
+        .asyncServerStreamingCall(channel.newCall(method, options), request, responseObserver),
+      request
+    )(monix.execution.Scheduler.global)
   }
 
   def asyncClientStreamingCall[ReqT, RespT](

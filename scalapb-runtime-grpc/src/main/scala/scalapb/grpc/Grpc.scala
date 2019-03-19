@@ -2,11 +2,13 @@ package scalapb.grpc
 
 import com.google.common.util.concurrent.{FutureCallback, Futures, ListenableFuture, MoreExecutors}
 import io.grpc.{Status, StatusException, StatusRuntimeException}
-import io.grpc.stub.StreamObserver
+import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver, StreamObserver}
 import monix.eval.Task
-import monix.execution.CancelablePromise
+import monix.execution.{Cancelable, CancelablePromise, Scheduler}
+import monix.reactive.observers.Subscriber
+import monix.reactive.{Observable, Observer, OverflowStrategy}
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{CancellationException, Future, Promise}
 import scala.util.Try
 
 object Grpc {
@@ -50,4 +52,29 @@ object Grpc {
 
     Task.fromCancelablePromise(p)
   }
+}
+
+object MonixGrpcAdapters {
+
+  def observe[TReq, TResp](grpcCall: (TReq, StreamObserver[TResp]) => Unit,
+                           parameters: TReq)
+                          (implicit scheduler: Scheduler): Observable[TResp] = {
+    Observable.create[TResp](OverflowStrategy.Fail(2048))((s: Subscriber[TResp]) => {
+      val grpcObserver = buildGrpcResponseObserver(s)(scheduler)
+      grpcCall(parameters, grpcObserver)
+      Cancelable(() => grpcObserver.onError(new CancellationException()))
+    })
+  }
+
+  private def buildGrpcResponseObserver[ReqT, RespT](observer: Observer[RespT])
+                                                    (implicit scheduler: Scheduler) =
+    new ClientResponseObserver[ReqT, RespT] {
+      override def beforeStart(requestStream: ClientCallStreamObserver[ReqT]): Unit = ()
+
+      override def onError(t: Throwable): Unit = observer.onError(t)
+
+      override def onCompleted(): Unit = observer.onComplete()
+
+      override def onNext(value: RespT): Unit = observer.onNext(value)
+    }
 }
