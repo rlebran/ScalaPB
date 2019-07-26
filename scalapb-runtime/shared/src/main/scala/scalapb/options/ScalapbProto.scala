@@ -9,16 +9,17 @@ object ScalapbProto extends _root_.scalapb.GeneratedFileObject {
   lazy val dependencies: Seq[_root_.scalapb.GeneratedFileObject] = Seq(
     com.google.protobuf.descriptor.DescriptorProtoCompanion
   )
-  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_]] = Seq(
-    scalapb.options.ScalaPbOptions,
-    scalapb.options.MessageOptions,
-    scalapb.options.FieldOptions,
-    scalapb.options.EnumOptions,
-    scalapb.options.EnumValueOptions,
-    scalapb.options.OneofOptions
-  )
+  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]] =
+    Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]](
+      scalapb.options.ScalaPbOptions,
+      scalapb.options.MessageOptions,
+      scalapb.options.FieldOptions,
+      scalapb.options.EnumOptions,
+      scalapb.options.EnumValueOptions,
+      scalapb.options.OneofOptions
+    )
   private lazy val ProtoBytes: Array[Byte] =
-      scalapb.Encoding.fromBase64(scala.collection.Seq(
+      scalapb.Encoding.fromBase64(scala.collection.immutable.Seq(
   """ChVzY2FsYXBiL3NjYWxhcGIucHJvdG8SB3NjYWxhcGIaIGdvb2dsZS9wcm90b2J1Zi9kZXNjcmlwdG9yLnByb3RvIs4HCg5TY
   2FsYVBiT3B0aW9ucxIzCgxwYWNrYWdlX25hbWUYASABKAlCEOI/DRILcGFja2FnZU5hbWVSC3BhY2thZ2VOYW1lEjMKDGZsYXRfc
   GFja2FnZRgCIAEoCEIQ4j8NEgtmbGF0UGFja2FnZVILZmxhdFBhY2thZ2USIwoGaW1wb3J0GAMgAygJQgviPwgSBmltcG9ydFIGa
@@ -32,11 +33,12 @@ object ScalapbProto extends _root_.scalapb.GeneratedFileObject {
   xgMIAEoCDoEdHJ1ZUIL4j8IEgZsZW5zZXNSBmxlbnNlcxJQChdyZXRhaW5fc291cmNlX2NvZGVfaW5mbxgNIAEoCEIZ4j8WEhRyZ
   XRhaW5Tb3VyY2VDb2RlSW5mb1IUcmV0YWluU291cmNlQ29kZUluZm8SJwoIbWFwX3R5cGUYDiABKAlCDOI/CRIHbWFwVHlwZVIHb
   WFwVHlwZRJiCh10ZXN0X29ubHlfbm9famF2YV9jb252ZXJzaW9ucxihjQYgASgIQh7iPxsSGXRlc3RPbmx5Tm9KYXZhQ29udmVyc
-  2lvbnNSGXRlc3RPbmx5Tm9KYXZhQ29udmVyc2lvbnMiJQoMT3B0aW9uc1Njb3BlEggKBEZJTEUQABILCgdQQUNLQUdFEAEinwIKD
+  2lvbnNSGXRlc3RPbmx5Tm9KYXZhQ29udmVyc2lvbnMiJQoMT3B0aW9uc1Njb3BlEggKBEZJTEUQABILCgdQQUNLQUdFEAEi6gIKD
   k1lc3NhZ2VPcHRpb25zEiYKB2V4dGVuZHMYASADKAlCDOI/CRIHZXh0ZW5kc1IHZXh0ZW5kcxJCChFjb21wYW5pb25fZXh0ZW5kc
   xgCIAMoCUIV4j8SEhBjb21wYW5pb25FeHRlbmRzUhBjb21wYW5pb25FeHRlbmRzEjIKC2Fubm90YXRpb25zGAMgAygJQhDiPw0SC
   2Fubm90YXRpb25zUgthbm5vdGF0aW9ucxIdCgR0eXBlGAQgASgJQgniPwYSBHR5cGVSBHR5cGUSTgoVY29tcGFuaW9uX2Fubm90Y
-  XRpb25zGAUgAygJQhniPxYSFGNvbXBhbmlvbkFubm90YXRpb25zUhRjb21wYW5pb25Bbm5vdGF0aW9ucyLyAgoMRmllbGRPcHRpb
+  XRpb25zGAUgAygJQhniPxYSFGNvbXBhbmlvbkFubm90YXRpb25zUhRjb21wYW5pb25Bbm5vdGF0aW9ucxJJChRzZWFsZWRfb25lb
+  2ZfZXh0ZW5kcxgGIAMoCUIX4j8UEhJzZWFsZWRPbmVvZkV4dGVuZHNSEnNlYWxlZE9uZW9mRXh0ZW5kcyLyAgoMRmllbGRPcHRpb
   25zEh0KBHR5cGUYASABKAlCCeI/BhIEdHlwZVIEdHlwZRItCgpzY2FsYV9uYW1lGAIgASgJQg7iPwsSCXNjYWxhTmFtZVIJc2Nhb
   GFOYW1lEjwKD2NvbGxlY3Rpb25fdHlwZRgDIAEoCUIT4j8QEg5jb2xsZWN0aW9uVHlwZVIOY29sbGVjdGlvblR5cGUSJwoIa2V5X
   3R5cGUYBCABKAlCDOI/CRIHa2V5VHlwZVIHa2V5VHlwZRItCgp2YWx1ZV90eXBlGAUgASgJQg7iPwsSCXZhbHVlVHlwZVIJdmFsd
@@ -67,15 +69,15 @@ object ScalapbProto extends _root_.scalapb.GeneratedFileObject {
   @deprecated("Use javaDescriptor instead. In a future version this will refer to scalaDescriptor.", "ScalaPB 0.5.47")
   def descriptor: com.google.protobuf.Descriptors.FileDescriptor = javaDescriptor
   val options: _root_.scalapb.GeneratedExtension[com.google.protobuf.descriptor.FileOptions, _root_.scala.Option[scalapb.options.ScalaPbOptions]] =
-    _root_.scalapb.GeneratedExtension.forOptionalUnknownField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.ScalaPbOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
+    _root_.scalapb.GeneratedExtension.forOptionalUnknownMessageField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.ScalaPbOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
   val message: _root_.scalapb.GeneratedExtension[com.google.protobuf.descriptor.MessageOptions, _root_.scala.Option[scalapb.options.MessageOptions]] =
-    _root_.scalapb.GeneratedExtension.forOptionalUnknownField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.MessageOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
+    _root_.scalapb.GeneratedExtension.forOptionalUnknownMessageField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.MessageOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
   val field: _root_.scalapb.GeneratedExtension[com.google.protobuf.descriptor.FieldOptions, _root_.scala.Option[scalapb.options.FieldOptions]] =
-    _root_.scalapb.GeneratedExtension.forOptionalUnknownField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.FieldOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
+    _root_.scalapb.GeneratedExtension.forOptionalUnknownMessageField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.FieldOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
   val enumOptions: _root_.scalapb.GeneratedExtension[com.google.protobuf.descriptor.EnumOptions, _root_.scala.Option[scalapb.options.EnumOptions]] =
-    _root_.scalapb.GeneratedExtension.forOptionalUnknownField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.EnumOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
+    _root_.scalapb.GeneratedExtension.forOptionalUnknownMessageField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.EnumOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
   val enumValue: _root_.scalapb.GeneratedExtension[com.google.protobuf.descriptor.EnumValueOptions, _root_.scala.Option[scalapb.options.EnumValueOptions]] =
-    _root_.scalapb.GeneratedExtension.forOptionalUnknownField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.EnumValueOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
+    _root_.scalapb.GeneratedExtension.forOptionalUnknownMessageField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.EnumValueOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
   val oneof: _root_.scalapb.GeneratedExtension[com.google.protobuf.descriptor.OneofOptions, _root_.scala.Option[scalapb.options.OneofOptions]] =
-    _root_.scalapb.GeneratedExtension.forOptionalUnknownField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.OneofOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
+    _root_.scalapb.GeneratedExtension.forOptionalUnknownMessageField(1020, _root_.scalapb.UnknownFieldSet.Field.lengthDelimitedLens)({__valueIn => _root_.scalapb.GeneratedExtension.readMessageFromByteString(scalapb.options.OneofOptions)(__valueIn)}, {__valueIn => __valueIn.toByteString})
 }

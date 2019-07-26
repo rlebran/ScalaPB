@@ -8,13 +8,14 @@ package com.google.protobuf.struct
 object StructProto extends _root_.scalapb.GeneratedFileObject {
   lazy val dependencies: Seq[_root_.scalapb.GeneratedFileObject] = Seq(
   )
-  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_]] = Seq(
-    com.google.protobuf.struct.Struct,
-    com.google.protobuf.struct.Value,
-    com.google.protobuf.struct.ListValue
-  )
+  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]] =
+    Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]](
+      com.google.protobuf.struct.Struct,
+      com.google.protobuf.struct.Value,
+      com.google.protobuf.struct.ListValue
+    )
   private lazy val ProtoBytes: Array[Byte] =
-      scalapb.Encoding.fromBase64(scala.collection.Seq(
+      scalapb.Encoding.fromBase64(scala.collection.immutable.Seq(
   """Chxnb29nbGUvcHJvdG9idWYvc3RydWN0LnByb3RvEg9nb29nbGUucHJvdG9idWYiuwEKBlN0cnVjdBJICgZmaWVsZHMYASADK
   AsyIy5nb29nbGUucHJvdG9idWYuU3RydWN0LkZpZWxkc0VudHJ5QgviPwgSBmZpZWxkc1IGZmllbGRzGmcKC0ZpZWxkc0VudHJ5E
   hoKA2tleRgBIAEoCUII4j8FEgNrZXlSA2tleRI4CgV2YWx1ZRgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZUIK4j8HEgV2Y

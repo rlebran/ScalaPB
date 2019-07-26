@@ -10,15 +10,16 @@ object TypeProto extends _root_.scalapb.GeneratedFileObject {
     com.google.protobuf.any.AnyProto,
     com.google.protobuf.source_context.SourceContextProto
   )
-  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_]] = Seq(
-    com.google.protobuf.`type`.Type,
-    com.google.protobuf.`type`.Field,
-    com.google.protobuf.`type`.Enum,
-    com.google.protobuf.`type`.EnumValue,
-    com.google.protobuf.`type`.OptionProto
-  )
+  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]] =
+    Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]](
+      com.google.protobuf.`type`.Type,
+      com.google.protobuf.`type`.Field,
+      com.google.protobuf.`type`.Enum,
+      com.google.protobuf.`type`.EnumValue,
+      com.google.protobuf.`type`.OptionProto
+    )
   private lazy val ProtoBytes: Array[Byte] =
-      scalapb.Encoding.fromBase64(scala.collection.Seq(
+      scalapb.Encoding.fromBase64(scala.collection.immutable.Seq(
   """Chpnb29nbGUvcHJvdG9idWYvdHlwZS5wcm90bxIPZ29vZ2xlLnByb3RvYnVmGhlnb29nbGUvcHJvdG9idWYvYW55LnByb3RvG
   iRnb29nbGUvcHJvdG9idWYvc291cmNlX2NvbnRleHQucHJvdG8i4QIKBFR5cGUSHQoEbmFtZRgBIAEoCUIJ4j8GEgRuYW1lUgRuY
   W1lEjsKBmZpZWxkcxgCIAMoCzIWLmdvb2dsZS5wcm90b2J1Zi5GaWVsZEIL4j8IEgZmaWVsZHNSBmZpZWxkcxIjCgZvbmVvZnMYA

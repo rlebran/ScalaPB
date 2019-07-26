@@ -7,34 +7,50 @@ val Scala211 = "2.11.12"
 
 val Scala212 = "2.12.8"
 
-val protobufVersion = "3.7.0"
+val Scala213 = "2.13.0"
+
+val protobufVersion = "3.7.1"
 
 val scalacheckVersion = "1.14.0"
 
 // For e2e test
-val sbtPluginVersion = "0.99.19"
+val sbtPluginVersion = "0.99.23"
 
-val grpcVersion = "1.19.0"
+val grpcVersion = "1.21.0"
 
-val MimaPreviousVersion = "0.9.0-RC1"
+val MimaPreviousVersion = "0.9.0-M2"
+
+val ProtocJar = "com.github.os72" % "protoc-jar" % "3.7.1"
+
+val ScalaTest = "org.scalatest" %% "scalatest" % "3.0.8"
+
+val utestVersion = Def.setting(
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, v)) if v <= 11 =>
+      // drop Scala 2.11 support since 0.6.9
+      "0.6.8"
+    case _ =>
+      "0.6.9"
+  }
+)
+
+val fastparseVersion = Def.setting(
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, v)) if v <= 11 =>
+      // drop Scala 2.11 support since 2.1.3
+      "2.1.2"
+    case _ =>
+      "2.1.3"
+  }
+)
 
 scalaVersion in ThisBuild := Scala212
 
-crossScalaVersions in ThisBuild := Seq(Scala210, Scala211, Scala212)
+crossScalaVersions in ThisBuild := Seq(Scala211, Scala212, Scala213)
 
-scalacOptions in ThisBuild ++= {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, v)) if v <= 11 => List("-target:jvm-1.7")
-    case _ => Nil
-  }
-}
+scalacOptions in ThisBuild ++= Seq("-deprecation",  "-target:jvm-1.8")
 
-javacOptions in ThisBuild ++= {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, v)) if v <= 11 => List("-target", "7", "-source", "7")
-    case _ => Nil
-  }
-}
+javacOptions in ThisBuild ++= List("-target", "8", "-source", "8")
 
 organization in ThisBuild := "com.thesamet.scalapb"
 
@@ -56,7 +72,8 @@ releaseProcess := Seq[ReleaseStep](
   commitReleaseVersion,
   tagRelease,
   releaseStepCommandAndRemaining(";+publishSigned"),
-  releaseStepCommandAndRemaining(s";++${Scala211};runtimeNative/publishSigned;lensesNative/publishSigned"),
+  releaseStepCommandAndRemaining(s";++${Scala212};protocGenScalapb/publishSigned"),
+  // releaseStepCommandAndRemaining(s";++${Scala211};runtimeNative/publishSigned;lensesNative/publishSigned"),
   setNextVersion,
   commitNextVersion,
   pushChanges,
@@ -69,7 +86,7 @@ lazy val sharedNativeSettings = List(
   crossScalaVersions := List(Scala211)
 )
 
-lazy val root =
+lazy val root: Project =
   project.in(file("."))
     .settings(
       publishArtifact := false,
@@ -85,31 +102,45 @@ lazy val root =
       compilerPlugin,
       compilerPluginShaded,
       proptest,
-      scalapbc)
+      scalapbc
+    )
 
-lazy val runtime = crossProject(JSPlatform, JVMPlatform, NativePlatform)
+// fastparse 2 is not available for Scala Native yet
+// https://github.com/lihaoyi/fastparse/issues/215
+lazy val runtime = crossProject(JSPlatform, JVMPlatform/*, NativePlatform*/)
   .crossType(CrossType.Full).in(file("scalapb-runtime"))
   .settings(
     name := "scalapb-runtime",
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %%% "fastparse" % "1.0.0",
-      "com.lihaoyi" %%% "utest" % "0.6.6" % "test",
+      "com.lihaoyi" %%% "fastparse" % fastparseVersion.value,
+      "com.lihaoyi" %%% "utest" % utestVersion.value % "test",
       "commons-codec" % "commons-codec" % "1.12" % "test",
       "com.google.protobuf" % "protobuf-java-util" % protobufVersion % "test",
     ),
+    unmanagedSourceDirectories in Compile ++= {
+      val base = (baseDirectory in LocalRootProject).value / "scalapb-runtime" / "shared" / "src" / "main"
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((2, v)) if v < 13 =>
+          Seq(base / "scala-pre-2.13")
+        case _ =>
+          Nil
+      }
+    },
     testFrameworks += new TestFramework("utest.runner.Framework"),
     unmanagedResourceDirectories in Compile += baseDirectory.value / "../../protobuf",
     mimaPreviousArtifacts := Set("com.thesamet.scalapb" %% "scalapb-runtime" % MimaPreviousVersion),
     mimaBinaryIssueFilters ++= {
       import com.typesafe.tools.mima.core._
       Seq(
+        ProblemFilters.exclude[MissingClassProblem]("scalapb.Utils"),
+        ProblemFilters.exclude[MissingClassProblem]("scalapb.Utils$")
       )
-    }
+    },
   )
   .dependsOn(lenses)
-  .platformsSettings(JSPlatform, NativePlatform)(
+  .platformsSettings(JSPlatform/*, NativePlatform*/)(
     libraryDependencies ++= Seq(
-      "com.thesamet.scalapb" %%% "protobuf-runtime-scala" % "0.7.1"
+      "com.thesamet.scalapb" %%% "protobuf-runtime-scala" % "0.8.2"
     ),
     (unmanagedSourceDirectories in Compile) += baseDirectory.value / ".." / "non-jvm" / "src" / "main" / "scala"
   )
@@ -118,7 +149,13 @@ lazy val runtime = crossProject(JSPlatform, JVMPlatform, NativePlatform)
     libraryDependencies ++= Seq(
       "com.google.protobuf" % "protobuf-java" % protobufVersion,
       "org.scalacheck" %% "scalacheck" % scalacheckVersion % "test",
-      "org.scalatest" %%% "scalatest" % "3.0.6" % "test"
+      ScalaTest % "test",
+    ),
+    // Can be removed after JDK 11.0.3 is available on Travis
+    Test / javaOptions ++= (
+        if (scalaVersion.value.startsWith("2.13."))
+              Seq("-XX:LoopStripMiningIter=0")
+              else Nil
     )
   )
   .jsSettings(
@@ -130,14 +167,16 @@ lazy val runtime = crossProject(JSPlatform, JVMPlatform, NativePlatform)
     },
     unmanagedResourceDirectories in Compile += baseDirectory.value / "../../third_party"
   )
+/*
   .nativeSettings(
     sharedNativeSettings
   )
+*/
 
 
 lazy val runtimeJVM    = runtime.jvm
 lazy val runtimeJS     = runtime.js
-lazy val runtimeNative = runtime.native
+//lazy val runtimeNative = runtime.native
 
 lazy val grpcRuntime = project.in(file("scalapb-runtime-grpc"))
   .dependsOn(runtimeJVM)
@@ -146,8 +185,8 @@ lazy val grpcRuntime = project.in(file("scalapb-runtime-grpc"))
     libraryDependencies ++= Seq(
       "io.grpc" % "grpc-stub" % grpcVersion,
       "io.grpc" % "grpc-protobuf" % grpcVersion,
-      "org.scalatest" %% "scalatest" % "3.0.6" % "test",
-      "org.mockito" % "mockito-core" % "2.23.4" % "test"
+      "org.mockito" % "mockito-core" % "2.28.2" % "test",
+      ScalaTest % "test",
     ),
     mimaPreviousArtifacts := Set("com.thesamet.scalapb" %% "scalapb-runtime-grpc" % MimaPreviousVersion)
   )
@@ -158,6 +197,7 @@ shadeTarget in ThisBuild := s"scalapbshade.v${version.value.replaceAll("[.-]","_
 
 lazy val compilerPlugin = project.in(file("compiler-plugin"))
   .settings(
+    crossScalaVersions := Seq(Scala210, Scala211, Scala212, Scala213),
     sourceGenerators in Compile += Def.task {
       val file = (sourceManaged in Compile).value / "scalapb" / "compiler" / "Version.scala"
       IO.write(file,
@@ -177,9 +217,10 @@ lazy val compilerPlugin = project.in(file("compiler-plugin"))
       Seq(dest)
     }.taskValue,
     libraryDependencies ++= Seq(
-      "com.thesamet.scalapb" %% "protoc-bridge" % "0.7.3",
-      "org.scalatest" %% "scalatest" % "3.0.6" % "test",
-      "com.github.os72" % "protoc-jar" % "3.7.0" % "test",
+      "com.thesamet.scalapb" %% "protoc-bridge" % "0.7.8",
+      "com.google.protobuf" % "protobuf-java" % protobufVersion,
+      ScalaTest % "test",
+      ProtocJar % "test",
     ),
     mimaPreviousArtifacts := Set("com.thesamet.scalapb" %% "compilerplugin" % MimaPreviousVersion),
     mimaBinaryIssueFilters ++= {
@@ -197,6 +238,7 @@ lazy val compilerPluginShaded = project.in(file("compiler-plugin-shaded"))
   .dependsOn(compilerPlugin)
   .settings(
     name := "compilerplugin-shaded",
+    crossScalaVersions := Seq(Scala210, Scala211, Scala212, Scala213),
     assemblyShadeRules in assembly := Seq(
       ShadeRule.rename("scalapb.options.Scalapb**" -> shadeTarget.value).inProject,
       ShadeRule.rename("com.google.**" -> shadeTarget.value).inAll
@@ -226,22 +268,83 @@ lazy val compilerPluginShaded = project.in(file("compiler-plugin-shaded"))
 
 lazy val scalapbc = project.in(file("scalapbc"))
   .dependsOn(compilerPlugin)
+  .enablePlugins(JavaAppPackaging)
+  .settings(
+    libraryDependencies ++= Seq(
+      ProtocJar
+    ),
+
+    /** Originally, we had scalapb.ScalaPBC as the only main class. Now when we added scalapb-gen, we start
+    * to take advantage over sbt-native-package ability to create multiple scripts. As a result the name of the
+      * executable it generates became scala-pbc. To avoid breakage we create under the scalapb.scripts the scripts
+      * with the names we would like to feed into scala-native-packager. We keep the original scalapb.ScalaPBC to not
+      * break integrations that use it (maven, pants), but we still want to exclude it below so a script named scala-pbc
+      * is not generated for it.
+      */
+    discoveredMainClasses in Compile := (discoveredMainClasses in Compile).value.filter(_.startsWith("scalapb.scripts.")),
+    mainClass in Compile := Some("scalapb.scripts.scalapbc"),
+    maintainer := "thesamet@gmail.com"
+  )
+
+lazy val protocGenScalapbUnix = project
+    .enablePlugins(AssemblyPlugin)
+    .dependsOn(scalapbc)
+    .settings(
+        assemblyOption in assembly := (assemblyOption in
+        assembly).value.copy(prependShellScript = Some(sbtassembly.AssemblyPlugin.defaultUniversalScript(shebang = true))),
+        skip in publish := true,
+        mainClass in Compile := Some("scalapb.scripts.ProtocGenScala"),
+    )
+
+lazy val protocGenScalapbWindows = project
+  .enablePlugins(AssemblyPlugin)
+  .dependsOn(scalapbc)
+  .settings(
+    assemblyOption in assembly := (assemblyOption in
+      assembly).value.copy(prependShellScript = Some(sbtassembly.AssemblyPlugin.defaultUniversalScript(shebang = false))),
+    skip in publish := true,
+    mainClass in Compile := Some("scalapb.scripts.ProtocGenScala")
+  )
+
+lazy val protocGenScalapb = project
+    .settings(
+      crossScalaVersions := List(Scala212),
+      name := "protoc-gen-scalapb",
+      publishArtifact in (Compile, packageDoc) := false,
+      publishArtifact in (Compile, packageSrc) := false,
+      crossPaths := false,
+      addArtifact(
+        Artifact("protoc-gen-scalapb", "jar", "sh", "unix"), assembly in (protocGenScalapbUnix, Compile)
+      ),
+      addArtifact(
+        Artifact("protoc-gen-scalapb", "jar", "bat", "windows"), assembly in (protocGenScalapbWindows, Compile)
+      ),
+      autoScalaLibrary := false
+    )
 
 lazy val proptest = project.in(file("proptest"))
-  .dependsOn(runtimeJVM, grpcRuntime, compilerPlugin)
+    .dependsOn(compilerPlugin, runtimeJVM, grpcRuntime)
     .settings(
       publishArtifact := false,
       publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
       libraryDependencies ++= Seq(
-        "com.github.os72" % "protoc-jar" % "3.7.0",
+        ProtocJar,
         "com.google.protobuf" % "protobuf-java" % protobufVersion,
         "io.grpc" % "grpc-netty" % grpcVersion % "test",
         "io.grpc" % "grpc-protobuf" % grpcVersion % "test",
         "org.scalacheck" %% "scalacheck" % scalacheckVersion % "test",
-        "org.scalatest" %% "scalatest" % "3.0.6" % "test"
+        ScalaTest % "test",
       ),
-      scalacOptions in Compile ++= Seq("-Xmax-classfile-name", "128"),
       libraryDependencies += { "org.scala-lang" % "scala-compiler" % scalaVersion.value },
+      Test / fork := true,
+      Test / baseDirectory := baseDirectory.value / "..",
+      Test / javaOptions ++= Seq("-Xmx2G", "-XX:MetaspaceSize=256M"),
+      // Can be removed after JDK 11.0.3 is available on Travis
+      Test / javaOptions ++= (
+          if (scalaVersion.value.startsWith("2.13."))
+                Seq("-XX:LoopStripMiningIter=0", "-Xmx4G")
+                else Nil
+      )
     )
 
 def genVersionFile(out: File, version: String): File = {
@@ -274,30 +377,23 @@ createVersionFile := {
   log.info(s"Created $f2")
 }
 
-lazy val lenses = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file("lenses"))
+
+lazy val lenses = crossProject(JSPlatform, JVMPlatform/*, NativePlatform*/).in(file("lenses"))
   .settings(
     name := "lenses",
-    sources in Test := {
+    unmanagedSourceDirectories in Compile ++= {
+      val base = (baseDirectory in LocalRootProject).value / "lenses" / "shared" / "src" / "main"
       CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, 13)) =>
-          // TODO utest_2.13.0-M3
-          Nil
+        case Some((2, v)) if v < 13 =>
+          Seq(base / "scala-pre-2.13")
         case _ =>
-          (sources in Test).value
-      },
-    },
-    testFrameworks += new TestFramework("utest.runner.Framework"),
-    libraryDependencies ++= {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, 13)) =>
-          // TODO utest_2.13.0-M3
           Nil
-        case _ =>
-          Seq(
-            "com.lihaoyi" %%% "utest" % "0.6.6" % "test"
-          )
       }
     },
+    testFrameworks += new TestFramework("utest.runner.Framework"),
+    libraryDependencies ++= Seq(
+        "com.lihaoyi" %%% "utest" % utestVersion.value % "test"
+    ),
     mimaPreviousArtifacts := Set("com.thesamet.scalapb" %% "lenses" % MimaPreviousVersion),
     mimaBinaryIssueFilters ++= {
       import com.typesafe.tools.mima.core._
@@ -313,19 +409,23 @@ lazy val lenses = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file(
       s"-P:scalajs:mapSourceURI:$a->$g/"
     }
   )
+/*
   .nativeSettings(
     sharedNativeSettings
   )
+*/
 
 lazy val lensesJVM = lenses.jvm
 lazy val lensesJS = lenses.js
-lazy val lensesNative = lenses.native
+//lazy val lensesNative = lenses.native
 
-lazy val docs = project.in(file("docs")) 
+lazy val docs = project.in(file("docs"))
   .enablePlugins(MicrositesPlugin, ScalaUnidocPlugin)
   .settings(
+    scalaVersion := Scala212,
+    crossScalaVersions := Seq(Scala212),
     libraryDependencies ++= Seq(
-        "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.2",
+        "com.thesamet.scalapb" %% "scalapb-json4s" % "0.9.0-M1",
     ),
     micrositeName := "ScalaPB",
     micrositeCompilingDocsTool := WithMdoc,

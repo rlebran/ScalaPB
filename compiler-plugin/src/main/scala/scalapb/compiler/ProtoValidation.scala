@@ -90,6 +90,10 @@ class ProtoValidation(implicits: DescriptorImplicits) {
           s"${m.getFullName}: sealed oneofs may not contain nested enums"
         )
       }
+    } else if (m.sealedOneOfExtendsCount > 0) {
+      throw new GeneratorException(
+        s"${m.getFullName}: is not a Sealed oneof and may not contain a sealed_oneof_extends message option. Use extends instead."
+      )
     }
   }
 
@@ -125,6 +129,11 @@ class ProtoValidation(implicits: DescriptorImplicits) {
       throw new GeneratorException(
         s"${fd.getFullName}: Field ${fd.getName} has no_box set but is not an optional field."
       )
+    if (fd.isMessage && fd.getMessageType.isSealedOneofType && fd.fieldOptions.hasType) {
+      throw new GeneratorException(
+        s"${fd.getFullName}: Sealed oneofs can not be type mapped. Use regular oneofs instead."
+      )
+    }
   }
 }
 
