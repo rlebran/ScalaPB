@@ -68,7 +68,11 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     val sealedOneof = for {
       file    <- files
       message <- file.allMessages if message.isSealedOneofType
-    } yield SealedOneof(message, message.getOneofs.get(0).getFields.asScala.map(_.getMessageType))
+    } yield
+      SealedOneof(
+        message,
+        message.getOneofs.get(0).getFields.asScala.map(_.getMessageType).toVector
+      )
     new SealedOneofsCache(sealedOneof)
   }
 
@@ -86,7 +90,7 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
           Some(descriptor.sealedOneofScalaType)
         else None
 
-      def baseScalaType = descriptor.scalaTypeName
+      def baseScalaType = descriptor.scalaTypeNameWithMaybeRoot
 
       def scalaType = customScalaType.getOrElse(baseScalaType)
     }
@@ -147,9 +151,13 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
 
     def blockingClient = self.getName + "BlockingClient"
 
+    def monixClient = self.getName + "MonixClient"
+
     def blockingStub = self.getName + "BlockingStub"
 
     def stub = self.getName + "Stub"
+
+    def monixStub = self.getName + "MonixStub"
 
     def methods = self.getMethods.asScala.toIndexedSeq
 
@@ -243,8 +251,14 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
       if (isSingular) EnclosingType.None
       else if (supportsPresence || fd.isInOneof) EnclosingType.ScalaOption
       else {
-        EnclosingType.Collection
+        EnclosingType.Collection(collectionType)
       }
+
+    def fieldMapEnclosingType: EnclosingType =
+      if (isSingular) EnclosingType.None
+      else if (supportsPresence || fd.isInOneof) EnclosingType.ScalaOption
+      else if (!fd.isMapField) EnclosingType.Collection(collectionType)
+      else EnclosingType.Collection(ScalaSeq)
 
     def isMapField = isMessage && fd.isRepeated && fd.getMessageType.isMapEntry
 
@@ -293,7 +307,7 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     def fieldsMapEmptyCollection: String = {
       require(fd.isRepeated)
       if (fd.isMapField) s"$ScalaSeq.empty"
-      else s"${collectionType}.empty"
+      else emptyCollection
     }
 
     def scalaTypeName: String =
@@ -443,7 +457,7 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
 
   implicit class MessageDescriptorPimp(val message: Descriptor) {
 
-    def fields = message.getFields.asScala.filter(_.getLiteType != FieldType.GROUP)
+    def fields = message.getFields.asScala.filter(_.getLiteType != FieldType.GROUP).toSeq
 
     def fieldsWithoutOneofs = fields.filterNot(_.isInOneof)
 
@@ -484,7 +498,10 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     def scalaTypeNameWithMaybeRoot: String = {
       val fullName        = scalaTypeName
       val topLevelPackage = fullName.split('.')(0)
-      if (!message.getFile.scalaPackageName.isEmpty)
+      val ConflictingNames = Seq(
+        "build" // Grpc stubs have a method build, so we need _root_ to disambiguate from that.
+      )
+      if (!message.getFile.scalaPackageName.isEmpty || ConflictingNames.contains(topLevelPackage))
         s"_root_.$fullName"
       else fullName
     }
@@ -517,6 +534,10 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     def extendsOption = messageOptions.getExtendsList.asScala.filterNot(valueClassNames).toSeq
 
     def companionExtendsOption = messageOptions.getCompanionExtendsList.asScala.toSeq
+
+    def sealedOneofExtendsOption = messageOptions.getSealedOneofExtendsList.asScala.toSeq
+
+    def sealedOneOfExtendsCount = messageOptions.getSealedOneofExtendsCount
 
     def nameSymbol = scalaName.asSymbol
 
@@ -598,6 +619,9 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
         companionExtendsOption ++
         specialMixins
     }
+
+    def sealedOneofBaseClasses: Seq[String] =
+      s"scalapb.GeneratedSealedOneof" +: messageOptions.getSealedOneofExtendsList.asScala.toSeq
 
     def nestedTypes: Seq[Descriptor] = message.getNestedTypes.asScala.toSeq
 
@@ -707,10 +731,10 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
       else s"${enum.getContainingType.scalaTypeName}.scalaDescriptor.enums(${enum.getIndex})"
 
     def baseTraitExtends: Seq[String] =
-      "_root_.scalapb.GeneratedEnum" +: scalaOptions.getExtendsList.asScala
+      "_root_.scalapb.GeneratedEnum" +: scalaOptions.getExtendsList.asScala.toSeq
 
     def companionExtends: Seq[String] =
-      s"_root_.scalapb.GeneratedEnumCompanion[${nameSymbol}]" +: scalaOptions.getCompanionExtendsList.asScala
+      s"_root_.scalapb.GeneratedEnumCompanion[${nameSymbol}]" +: scalaOptions.getCompanionExtendsList.asScala.toSeq
 
     def sourcePath: Seq[Int] = {
       if (enum.isTopLevel) Seq(FileDescriptorProto.ENUM_TYPE_FIELD_NUMBER, enum.getIndex)
@@ -735,13 +759,16 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
       enumValue.getOptions.getExtension[EnumValueOptions](Scalapb.enumValue)
 
     def valueExtends: Seq[String] =
-      enumValue.getType.nameSymbol +: scalaOptions.getExtendsList.asScala
+      enumValue.getType.nameSymbol +: scalaOptions.getExtendsList.asScala.toSeq
 
     def isName = {
       Helper.makeUniqueNames(
-        enumValue.getType.getValues.asScala.sortBy(v => (v.getNumber, v.getName)).map { e =>
-          e -> ("is" + allCapsToCamelCase(e.getName, true))
-        }
+        enumValue.getType.getValues.asScala
+          .sortBy(v => (v.getNumber, v.getName))
+          .map { e =>
+            e -> ("is" + allCapsToCamelCase(e.getName, true))
+          }
+          .toSeq
       )(enumValue)
     }
 
@@ -776,10 +803,17 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     def javaPackageAsSymbol: String =
       javaPackage.split('.').map(_.asSymbol).mkString(".")
 
-    private def hasConflictingJavaClassName(className: String) =
+    private def hasConflictingJavaClassName(className: String): Boolean =
       (file.getEnumTypes.asScala.exists(_.getName == className) ||
         file.getServices.asScala.exists(_.getName == className) ||
         file.getMessageTypes.asScala.exists(_.hasConflictingJavaClassName(className)))
+
+    // This method does not scan recursively. Currently it is used to determine whether the file
+    // companion object would conflict with any top-level generated class.
+    private def hasConflictingScalaClassName(str: String): Boolean =
+      file.getMessageTypes.asScala.exists(_.getName.toLowerCase == str.toLowerCase) ||
+        file.getEnumTypes.asScala.exists(_.getName.toLowerCase == str.toLowerCase) ||
+        file.getServices.asScala.exists(_.getName.toLowerCase == str.toLowerCase)
 
     def javaOuterClassName: String =
       if (file.getOptions.hasJavaOuterClassname)
@@ -796,7 +830,7 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     private def scalaPackageParts: Seq[String] = {
       val requestedPackageName: Seq[String] =
         (if (scalaOptions.hasPackageName) scalaOptions.getPackageName.split('.')
-         else javaPackage.split('.')).filterNot(_.isEmpty)
+         else javaPackage.split('.')).toIndexedSeq.filterNot(_.isEmpty)
 
       if (scalaOptions.getFlatPackage || (params.flatPackage && !isNonFlatDependency))
         requestedPackageName
@@ -840,8 +874,10 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
     }
 
     def fileDescriptorObjectName = {
+
       def inner(s: String): String =
-        if (!hasConflictingJavaClassName(s)) s else (s + "Companion")
+        if (!hasConflictingJavaClassName(s) && !hasConflictingScalaClassName(s)) s
+        else (s + "Companion")
 
       if (file.scalaOptions.hasObjectName) file.scalaOptions.getObjectName
       else
@@ -905,10 +941,11 @@ class DescriptorImplicits(params: GeneratorParams, files: Seq[FileDescriptor]) {
 }
 
 private[scalapb] object DescriptorImplicits {
-  val ScalaSeq    = "_root_.scala.collection.Seq"
-  val ScalaMap    = "_root_.scala.collection.immutable.Map"
-  val ScalaVector = "_root_.scala.collection.immutable.Vector"
-  val ScalaOption = "_root_.scala.Option"
+  val ScalaSeq      = "_root_.scala.Seq"
+  val ScalaMap      = "_root_.scala.collection.immutable.Map"
+  val ScalaVector   = "_root_.scala.collection.immutable.Vector"
+  val ScalaIterable = "_root_.scala.collection.immutable.Iterable"
+  val ScalaOption   = "_root_.scala.Option"
 }
 
 object Helper {

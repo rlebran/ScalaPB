@@ -176,7 +176,9 @@ object SchemaGenerators {
       "--scala_out",
       "grpc,java_conversions:" + tmpDir.toString
     ) ++ files
-    runProtoc(args: _*)
+    if (runProtoc(args: _*) != 0) {
+      throw new RuntimeException("Protoc failed")
+    }
   }
 
   def getFileTree(f: File): Stream[File] =
@@ -228,7 +230,7 @@ object SchemaGenerators {
       jarForClass[com.google.common.util.concurrent.ListenableFuture[_]],
       jarForClass[javax.annotation.Nullable],
       jarForClass[scalapb.lenses.Lens[_, _]].getPath,
-      jarForClass[fastparse.core.Parsed[_, _, _]].getPath,
+      jarForClass[fastparse.Parsed[_]].getPath,
       rootDir
     )
     val annotationJar =
@@ -238,15 +240,16 @@ object SchemaGenerators {
     val scalaFiles = getFileTree(rootDir)
       .filter(f => f.isFile && f.getName.endsWith(".scala"))
     val s = new Settings(error => throw new RuntimeException(error))
-    val maybeBreakCycles =
+    val maybeBreakCycles: Seq[String] =
       if (!scala.util.Properties.versionNumberString.startsWith("2.10."))
-        "-Ybreak-cycles"
-      else ""
+        Seq("-Ybreak-cycles")
+      else Seq.empty
+
     s.processArgumentString(
       s"""-cp "${classPath.mkString(":")}" ${maybeBreakCycles} -d "$rootDir""""
     )
-    val g = new Global(s)
 
+    val g   = new Global(s)
     val run = new g.Run
     run.compile(scalaFiles.map(_.toString).toList)
     println("[DONE]")
@@ -290,9 +293,17 @@ object SchemaGenerators {
     GraphGen.genRootNode.map { rootNode =>
       val tmpDir = writeFileSet(rootNode)
       println(s"Compiling in $tmpDir.")
-      compileProtos(rootNode, tmpDir)
-      compileJavaInDir(tmpDir)
-      compileScalaInDir(tmpDir)
+      try {
+        compileProtos(rootNode, tmpDir)
+        compileJavaInDir(tmpDir)
+        compileScalaInDir(tmpDir)
+      } finally {
+        // Some versions of run.compile throw an exception, some exit with an int (depends on Scala
+        // version). Let's generate protos.tgz anyway for debugging.
+        sys.process
+          .Process(Seq("tar", "czf", "/tmp/protos.tgz", "--exclude", "*.class", "."), tmpDir)
+          .!!
+      }
 
       CompiledSchema(rootNode, tmpDir)
     }

@@ -9,13 +9,14 @@ object PluginProto extends _root_.scalapb.GeneratedFileObject {
   lazy val dependencies: Seq[_root_.scalapb.GeneratedFileObject] = Seq(
     com.google.protobuf.descriptor.DescriptorProtoCompanion
   )
-  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_]] = Seq(
-    com.google.protobuf.compiler.plugin.Version,
-    com.google.protobuf.compiler.plugin.CodeGeneratorRequest,
-    com.google.protobuf.compiler.plugin.CodeGeneratorResponse
-  )
+  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]] =
+    Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]](
+      com.google.protobuf.compiler.plugin.Version,
+      com.google.protobuf.compiler.plugin.CodeGeneratorRequest,
+      com.google.protobuf.compiler.plugin.CodeGeneratorResponse
+    )
   private lazy val ProtoBytes: Array[Byte] =
-      scalapb.Encoding.fromBase64(scala.collection.Seq(
+      scalapb.Encoding.fromBase64(scala.collection.immutable.Seq(
   """CiVnb29nbGUvcHJvdG9idWYvY29tcGlsZXIvcGx1Z2luLnByb3RvEhhnb29nbGUucHJvdG9idWYuY29tcGlsZXIaIGdvb2dsZ
   S9wcm90b2J1Zi9kZXNjcmlwdG9yLnByb3RvIpQBCgdWZXJzaW9uEiAKBW1ham9yGAEgASgFQgriPwcSBW1ham9yUgVtYWpvchIgC
   gVtaW5vchgCIAEoBUIK4j8HEgVtaW5vclIFbWlub3ISIAoFcGF0Y2gYAyABKAVCCuI/BxIFcGF0Y2hSBXBhdGNoEiMKBnN1ZmZpe

@@ -8,11 +8,12 @@ package com.google.protobuf.source_context
 object SourceContextProto extends _root_.scalapb.GeneratedFileObject {
   lazy val dependencies: Seq[_root_.scalapb.GeneratedFileObject] = Seq(
   )
-  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_]] = Seq(
-    com.google.protobuf.source_context.SourceContext
-  )
+  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]] =
+    Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]](
+      com.google.protobuf.source_context.SourceContext
+    )
   private lazy val ProtoBytes: Array[Byte] =
-      scalapb.Encoding.fromBase64(scala.collection.Seq(
+      scalapb.Encoding.fromBase64(scala.collection.immutable.Seq(
   """CiRnb29nbGUvcHJvdG9idWYvc291cmNlX2NvbnRleHQucHJvdG8SD2dvb2dsZS5wcm90b2J1ZiI7Cg1Tb3VyY2VDb250ZXh0E
   ioKCWZpbGVfbmFtZRgBIAEoCUIN4j8KEghmaWxlTmFtZVIIZmlsZU5hbWVClQEKE2NvbS5nb29nbGUucHJvdG9idWZCElNvdXJjZ
   UNvbnRleHRQcm90b1ABWkFnb29nbGUuZ29sYW5nLm9yZy9nZW5wcm90by9wcm90b2J1Zi9zb3VyY2VfY29udGV4dDtzb3VyY2VfY

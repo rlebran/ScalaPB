@@ -9,7 +9,7 @@ OUTDIR=compiler-plugin/src/main/java
 TMPDIR=$(mktemp -d)
 
 # Setup protoc
-PROTOC_JAR_VERSION=3.7.0
+PROTOC_JAR_VERSION=3.7.1
 JAR_FILENAME=protoc-jar-$PROTOC_JAR_VERSION.jar
 JAR_PATH=${HOME}/.ivy2/cache/com.github.os72/protoc-jar/jars/$JAR_FILENAME
 JAR_URL=http://central.maven.org/maven2/com/github/os72/protoc-jar/$PROTOC_JAR_VERSION/$JAR_FILENAME
@@ -21,7 +21,7 @@ fi
 
 function protoc_jar() 
 {
-  java -jar $JAR_PATH -v370 "$@"
+  java -jar $JAR_PATH -v371 "$@"
 }
 
 # SBT 1.x depends on scalapb-runtime which contains a compiled copy of
@@ -46,7 +46,7 @@ protoc_jar --java_out=scalapb-runtime/jvm/src/main/java --proto_path=./protobuf 
 
 GOOGLE_PROTOS=$(find third_party/google/protobuf/ -name '*.proto' -print)
 
-sbt "scalapbc/run --scala_out=java_conversions:scalapb-runtime/jvm/src/main/scala \
+sbt "++2.12.8" "scalapbc/run --scala_out=java_conversions:scalapb-runtime/jvm/src/main/scala \
     --proto_path=./third_party \
     $GOOGLE_PROTOS" \
     "scalapbc/run --scala_out=scalapb-runtime/non-jvm/src/main/scala \

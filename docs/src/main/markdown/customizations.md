@@ -219,6 +219,23 @@ message MyMessage {
 Will generate a case class that extends `MySuperClass`, and the companion
 object will extend `MySuperCompanionClass`.
 
+# Custom base traits for sealed oneofs
+
+Note: this option is available in ScalaPB 0.9.0 and later.
+
+Use the following option to define one or more base traits for a generated SealedOneof:
+
+```protobuf
+message MyEither {
+  option (scalapb.message).sealed_oneof_extends = "MyBaseTrait";
+
+  oneof sealed_value {
+    Left left = 1;
+    Right right = 2;
+  }
+}
+```
+
 # Custom base traits for enums
 
 In a similar fashion to custom base traits for messages, it is possible to
@@ -272,6 +289,8 @@ correctness. For example, instead of using a raw integer for time fields, you ca
 wrap them in a `Seconds` class.
 
 ```protobuf
+import "scalapb/scalapb.proto";
+
 message Connection {
   optional int32 timeout = 1 [(scalapb.field).type = "mydomain.Seconds"];
 }
@@ -312,6 +331,23 @@ For more examples, see:
 - [`custom_types.proto`](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/protobuf/custom_types.proto)
 - [`PersonId.scala`](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/scala/com/thesamet/pb/PersonId.scala)
 - [`CustomTypesSpec.scala`](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/test/scala/CustomTypesSpec.scala)
+
+If you have a TypeMapper that maps a generated type into a type you don't own
+(such as `String`, or a third-party class) then you don't have access to the
+companion object to define the typemapper in. Instead, you can place the
+typemapper in one of the parent package objects of the generated code. For
+example, if you want to map an enum to a string, and the message containing it
+goes into the `a.b.c` package, you can define the type mapper like this:
+
+```scala
+// src/main/scala/a/b/c/package.scala:
+package a.b
+
+package object c {
+  implicit val segmentType =
+    TypeMapper[SegmentType, String](_.name)(SegmentType.fromName(_).get)
+}
+```
 
 ## Custom types on maps
 
@@ -396,8 +432,8 @@ Note: Most Scala collections can be used with this feature. If you are trying
 to implement your own collection type, it may be useful to check `MyVector`
 and `MyMap`, the simplest custom collection that is compatible with ScalaPB:
 
-- [MyVector.scala](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/scala/com/thesamet/pb/MyVector.scala)
-- [MyMap.scala](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/scala/com/thesamet/pb/MyMap.scala)
+- [MyVector.scala](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/scala-pre-2.13/com/thesamet/pb/MyVector.scala)
+- [MyMap.scala](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/scala-pre-2.13/com/thesamet/pb/MyMap.scala)
 - [collection_types.proto](https://github.com/scalapb/ScalaPB/blob/master/e2e/src/main/protobuf/collection_types.proto)
 
 # Custom names

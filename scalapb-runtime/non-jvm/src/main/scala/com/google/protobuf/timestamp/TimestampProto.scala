@@ -8,11 +8,12 @@ package com.google.protobuf.timestamp
 object TimestampProto extends _root_.scalapb.GeneratedFileObject {
   lazy val dependencies: Seq[_root_.scalapb.GeneratedFileObject] = Seq(
   )
-  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_]] = Seq(
-    com.google.protobuf.timestamp.Timestamp
-  )
+  lazy val messagesCompanions: Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]] =
+    Seq[_root_.scalapb.GeneratedMessageCompanion[_ <: _root_.scalapb.GeneratedMessage]](
+      com.google.protobuf.timestamp.Timestamp
+    )
   private lazy val ProtoBytes: Array[Byte] =
-      scalapb.Encoding.fromBase64(scala.collection.Seq(
+      scalapb.Encoding.fromBase64(scala.collection.immutable.Seq(
   """Ch9nb29nbGUvcHJvdG9idWYvdGltZXN0YW1wLnByb3RvEg9nb29nbGUucHJvdG9idWYiVQoJVGltZXN0YW1wEiYKB3NlY29uZ
   HMYASABKANCDOI/CRIHc2Vjb25kc1IHc2Vjb25kcxIgCgVuYW5vcxgCIAEoBUIK4j8HEgVuYW5vc1IFbmFub3NCfgoTY29tLmdvb
   2dsZS5wcm90b2J1ZkIOVGltZXN0YW1wUHJvdG9QAVorZ2l0aHViLmNvbS9nb2xhbmcvcHJvdG9idWYvcHR5cGVzL3RpbWVzdGFtc

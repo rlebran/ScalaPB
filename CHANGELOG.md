@@ -1,9 +1,26 @@
 # Change Log
 
 ## [0.9.0](https://github.com/scalapb/ScalaPB/tree/HEAD)
+- Experimental support for Scala 2.13.0. Notes:
+  - ScalaPB now generates `scala.Seq` by default for repeated
+    fields (previously was `scala.collection.Seq`). This ensures usage of
+    immutable Seqs on Scala 2.13 without breaking compatibility for old code.
+  - The generated code compiles for Scala 2.13 and older version, so deprecation warnings
+    are expected when compiling for 2.13. In a future release, we may have a
+    generator that generates code that compiles cleanly, but only for 2.13.
+- ScalaPB code generator is published to maven as a plugin. This enabled
+  Gradle and Maven protobuf plugins to download and invoke ScalaPB.
+- Dropped support for Scala 2.10.
+- Custom collections are now required to provide an `iterator` method that
+  returns an `Iterator[A]` over their elements.
+- Temporarily dropped support for Scala Native (pending on fastparse2 support)
+- Bumped fastparse to 2.1.0 (which is binary-incompatible with fastparse 1)
 - Add support for custom map types (#410)
-- Upgrade to protobuf 3.7.0
+- Upgrade to protobuf 3.7.1
 - Removed deprecated com.trueaccord symbols
+- Added `scalapb.GeneratedSealedOneof` as a base trait for all sealed oneofs.
+- Added `sealed_oneof_extends` option to allow adding base classes for sealed oneofs.
+- Add support for services & methods comments (scaladoc & runtime inspection)
 
 ## [0.8.4](https://github.com/scalapb/ScalaPB/tree/v0.8.4)
 [Full Changelog](https://github.com/scalapb/ScalaPB/compare/v0.8.3...v0.8.4)

@@ -1,6 +1,8 @@
 import scalapb.compiler.Version.grpcJavaVersion
 
-crossScalaVersions in ThisBuild := Seq("2.10.7", "2.11.12", "2.12.8")
+crossScalaVersions in ThisBuild := Seq("2.11.12", "2.12.8", "2.13.0")
+
+scalaVersion in ThisBuild := "2.12.8"
 
 val grpcArtifactId = "protoc-gen-grpc-java"
 
@@ -22,25 +24,33 @@ val grpcExePath = SettingKey[xsbti.api.Lazy[File]]("grpcExePath")
 
 
 val commonSettings = Seq(
-    scalacOptions ++= Seq("-deprecation", "-Ywarn-numeric-widen"),
     scalacOptions in Test ++= PartialFunction.condOpt(CrossVersion.partialVersion(scalaVersion.value)){
-      case Some((2, v)) if v >= 11 =>
+      case Some((2, v)) if v >= 11 && v < 12 =>
         Seq("-Ywarn-unused-import")
+      case Some((2, v)) if v == 13 =>
+        Seq("-Ywarn-unused:imports")
     }.toList.flatten,
     javacOptions ++= Seq("-Xlint:deprecation"),
     PB.protocOptions in Compile ++= Seq(
         s"--plugin=protoc-gen-java_rpc=${grpcExePath.value.get}",
-        s"--java_rpc_out=${((sourceManaged in Compile).value).getAbsolutePath}"
     ),
+    unmanagedSourceDirectories in Compile ++= {
+      val base = (baseDirectory in Compile).value / "src" / "main"
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((2, v)) if v < 13 =>
+          Seq(base / "scala-pre-2.13")
+        case _ =>
+          Nil
+      }
+    },
     libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % "3.0.6" % "test",
+      "org.scalatest" %% "scalatest" % "3.0.8" % "test",
       "io.grpc" % "grpc-netty" % grpcJavaVersion, //netty transport of grpc
       "io.grpc" % "grpc-protobuf" % grpcJavaVersion, //protobuf message encoding for java implementation
       "io.grpc" % "grpc-services" % grpcJavaVersion,
       "io.grpc" % "grpc-services" % grpcJavaVersion % "protobuf",
       "org.scalacheck" %% "scalacheck" % "1.14.0" % "test",
       "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.Version.scalapbVersion % "protobuf",
-      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0-rc1",
       "javax.annotation" % "javax.annotation-api" % "1.3.2",  // needed for grpc-java on JDK9
     ),
 
@@ -59,13 +69,18 @@ val commonSettings = Seq(
         println("grpc protoc plugin (for Java) exists.")
       }
       exe
-    }
+    },
+
+    fork in Test := true,  // For https://github.com/scala/bug/issues/9237
   )
 
 lazy val root = (project in file("."))
   .settings(commonSettings)
   .settings(
     PB.protoSources in Compile += (PB.externalIncludePath in Compile).value / "grpc" / "reflection",
+    PB.protocOptions in Compile ++= Seq(
+        s"--java_rpc_out=${((sourceManaged in Compile).value).getAbsolutePath}"
+    ),
     PB.targets in Compile := Seq(
       PB.gens.java -> (sourceManaged in Compile).value,
       scalapb.gen(javaConversions = true) -> (sourceManaged in Compile).value
@@ -81,6 +96,9 @@ lazy val noJava = (project in file("nojava"))
       scalapb.gen() -> (sourceManaged in Compile).value
     ),
     libraryDependencies ++= Seq(
+      "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.Version.scalapbVersion,
       "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.Version.scalapbVersion % "protobuf"
     )
   )
+
+// addCompilerPlugin(scalafixSemanticdb)

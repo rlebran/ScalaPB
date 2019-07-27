@@ -1,6 +1,7 @@
 package scalapb.grpc
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, MethodDescriptor}
+import monix.eval.Task
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -22,6 +23,17 @@ object ClientCalls {
       request: ReqT
   ): Future[RespT] = {
     Grpc.guavaFuture2ScalaFuture(
+      io.grpc.stub.ClientCalls.futureUnaryCall(channel.newCall(method, options), request)
+    )
+  }
+
+  def taskAsyncUnaryCall[ReqT, RespT](
+      channel: Channel,
+      method: MethodDescriptor[ReqT, RespT],
+      options: CallOptions,
+      request: ReqT
+  ): Task[RespT] = {
+    Grpc.guavaFuture2Task(
       io.grpc.stub.ClientCalls.futureUnaryCall(channel.newCall(method, options), request)
     )
   }
