@@ -12,14 +12,7 @@ import scala.util.Try
 object Grpc {
   def guavaFuture2ScalaFuture[A](guavaFuture: ListenableFuture[A]): Future[A] = {
     val p = Promise[A]()
-    Futures.addCallback(
-      guavaFuture,
-      new FutureCallback[A] {
-        override def onFailure(t: Throwable): Unit = p.failure(t)
-        override def onSuccess(a: A): Unit         = p.success(a)
-      },
-      MoreExecutors.directExecutor()
-    )
+    attachFutureCallback(guavaFuture, p)
     p.future
   }
 
@@ -39,6 +32,11 @@ object Grpc {
 
   def guavaFuture2Task[A](guavaFuture: ListenableFuture[A]): Task[A] = {
     val p = CancelablePromise[A]()
+    attachFutureCallback(guavaFuture, p)
+    Task.fromCancelablePromise(p)
+  }
+
+  private def attachFutureCallback[A](guavaFuture: ListenableFuture[A], p: Promise[A]): Unit = {
     Futures.addCallback(
       guavaFuture,
       new FutureCallback[A] {
@@ -47,7 +45,5 @@ object Grpc {
       },
       MoreExecutors.directExecutor()
     )
-
-    Task.fromCancelablePromise(p)
   }
 }
