@@ -59,7 +59,7 @@ resolvers in ThisBuild +=
 
 publishMavenStyle in ThisBuild := true
 publishTo in ThisBuild := {
-  val nexus = "https://build.powerspace.com/artifactory/"
+  val nexus = "https://repo.powerspace.com/artifactory/"
   if (Keys.isSnapshot.value)
     Some("snapshots" at nexus + "sbt-snapshot-local")
   else
