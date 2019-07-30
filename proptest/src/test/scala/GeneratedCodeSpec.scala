@@ -31,7 +31,7 @@ class GeneratedCodeSpec extends PropSpec with ScalaCheckDrivenPropertyChecks wit
     }
   }
 
-  property("Java and Scala protos are equivalent", Slow) {
+  ignore("Java and Scala protos are equivalent", Slow) {
     forAll(SchemaGenerators.genCompiledSchema, workers(1), minSuccessful(20)) {
       schema: CompiledSchema =>
         forAll(GenData.genMessageValueInstance(schema.rootNode)) {
