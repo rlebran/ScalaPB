@@ -57,7 +57,15 @@ organization in ThisBuild := "com.thesamet.scalapb"
 resolvers in ThisBuild +=
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
-publishTo in ThisBuild := sonatypePublishTo.value
+publishMavenStyle in ThisBuild := true
+publishTo in ThisBuild := {
+  val nexus = "https://build.powerspace.com/artifactory/"
+  if (Keys.isSnapshot.value)
+    Some("snapshots" at nexus + "sbt-snapshot-local")
+  else
+    Some("releases" at nexus + "sbt-release-local")
+}
+credentials in ThisBuild += Credentials(Path.userHome / ".sbt" / ".credentials")
 
 releaseCrossBuild := true
 
@@ -71,9 +79,6 @@ releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,
   commitReleaseVersion,
   tagRelease,
-  releaseStepCommandAndRemaining(";+publishSigned"),
-  releaseStepCommandAndRemaining(s";++${Scala212};protocGenScalapb/publishSigned"),
-  // releaseStepCommandAndRemaining(s";++${Scala211};runtimeNative/publishSigned;lensesNative/publishSigned"),
   setNextVersion,
   commitNextVersion,
   pushChanges,
